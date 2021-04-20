@@ -1,12 +1,12 @@
 import hashlib
 
-from fastapi import FastAPI,Response,status
+from fastapi import FastAPI, Response, status
 
 app = FastAPI()
 
 
 @app.get("/auth")
-def get(password: str, password_hash: str, response: Response):
+def get(response: Response, password: str = None, password_hash: str = None):
     response.status_code = status.HTTP_401_UNAUTHORIZED
     if password is None or password_hash is None:
         return
