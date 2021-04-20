@@ -1,19 +1,15 @@
-from fastapi import FastAPI
+import hashlib
+
+from fastapi import FastAPI,Response,status
 
 app = FastAPI()
 
-@app.get("/method")
-def get():
-    return {"method": "GET"}
-@app.put("/method")
-def put():
-    return {"method": "PUT"}
-@app.options("/method")
-def options():
-    return {"method": "OPTIONS"}
-@app.delete("/method")
-def delete():
-    return {"method": "DELETE"}
-@app.post("/method", status_code=201)
-def post():
-    return {"method": "POST"}
+
+@app.get("/auth", status_code=204)
+def get(password: str, password_hash: str, response: Response):
+    encrypted = hashlib.sha512(str(password).encode("utf-8")).hexdigest()
+    if encrypted == password_hash:
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return
+    response.status_code = status.HTTP_401_UNAUTHORIZED
+    return
