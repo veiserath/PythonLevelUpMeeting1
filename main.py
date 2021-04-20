@@ -43,8 +43,8 @@ def register(response: Response, modified_details: ModifiedDetails):
     end_date = end_date.strftime("%Y-%m-%d")
     data_set = {"id": app.counter, "name": modified_details.name, "surname": modified_details.surname,
                 "register_date": start_date, "vaccination_date": end_date}
-    json_dump = json.dumps(data_set)
+    # json_dump = json.dumps(data_set)
     # item = Details(app.counter, modified_details.name, modified_details.surname, start_date, end_date)
     # json_compatible_item_data = jsonable_encoder(item)
     app.counter += 1
-    return json_dump
+    return data_set
