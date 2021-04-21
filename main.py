@@ -1,12 +1,8 @@
-from urllib.request import Request
 from fastapi import FastAPI, Response, status
-from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
 import datetime
-from datetime import timedelta
 from datetime import date
-import json
+
 
 app = FastAPI()
 app.counter = 1
@@ -37,11 +33,17 @@ def register(response: Response, modified_details: ModifiedDetails):
     response.status_code = status.HTTP_201_CREATED
     start_date = date.today()
     counter = 0
+    i = 0
     for character in modified_details.name:
-        if 'A' <= character <= 'Z' or 'a' <= character <= 'z':
+        if i == 0 and 'A' <= character <= 'Z':
             counter += 1
+        elif 'a' <= character <= 'z':
+            counter += 1
+    i = 0
     for character in modified_details.surname:
-        if 'A' <= character <= 'Z' or 'a' <= character <= 'z':
+        if i == 0 and 'A' <= character <= 'Z':
+            counter += 1
+        elif 'a' <= character <= 'z':
             counter += 1
     timedifference = datetime.timedelta(days=counter)
     end_date = start_date + timedifference
@@ -49,8 +51,5 @@ def register(response: Response, modified_details: ModifiedDetails):
     end_date = end_date.strftime("%Y-%m-%d")
     data_set = {"id": app.counter, "name": modified_details.name, "surname": modified_details.surname,
                 "register_date": start_date, "vaccination_date": end_date}
-    # json_dump = json.dumps(data_set)
-    # item = Details(app.counter, modified_details.name, modified_details.surname, start_date, end_date)
-    # json_compatible_item_data = jsonable_encoder(item)
     app.counter += 1
     return data_set
