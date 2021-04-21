@@ -3,7 +3,6 @@ from pydantic import BaseModel
 import datetime
 from datetime import date
 
-
 app = FastAPI()
 app.counter = 1
 
@@ -37,12 +36,14 @@ def register(response: Response, modified_details: ModifiedDetails):
     for character in modified_details.name:
         if i == 0 and 'A' <= character <= 'Z':
             counter += 1
+            i += 1
         elif 'a' <= character <= 'z':
             counter += 1
     i = 0
     for character in modified_details.surname:
         if i == 0 and 'A' <= character <= 'Z':
             counter += 1
+            i += 1
         elif 'a' <= character <= 'z':
             counter += 1
     timedifference = datetime.timedelta(days=counter)
