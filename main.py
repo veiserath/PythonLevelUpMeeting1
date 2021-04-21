@@ -39,13 +39,14 @@ def register(response: Response, modified_details: ModifiedDetails):
             i += 1
         elif 'a' <= character <= 'z':
             counter += 1
+        i += 1
     i = 0
     for character in modified_details.surname:
         if i == 0 and 'A' <= character <= 'Z':
             counter += 1
-            i += 1
         elif 'a' <= character <= 'z':
             counter += 1
+        i += 1
     timedifference = datetime.timedelta(days=counter)
     end_date = start_date + timedifference
     start_date = start_date.strftime("%Y-%m-%d")
