@@ -1,5 +1,5 @@
 from hashlib import sha256
-from fastapi import FastAPI, Response, Cookie, HTTPException, status
+from fastapi import FastAPI, Response, Cookie, HTTPException, status, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 app = FastAPI()
@@ -10,7 +10,7 @@ security = HTTPBasic()
 
 
 @app.post("/login_session")
-def login(response: Response,credentials: HTTPBasicCredentials = Depends(security)):
+def login(response: Response, credentials: HTTPBasicCredentials = Depends(security)):
     user = credentials.username
     password = credentials.password
     if user == "4dm1n" and password == "NotSoSecurePa$$":
@@ -25,7 +25,8 @@ def login(response: Response,credentials: HTTPBasicCredentials = Depends(securit
 
 
 @app.post("/login_token")
-def secured_data(response: Response, session_token: str = Cookie(None),credentials: HTTPBasicCredentials = Depends(security)):
+def secured_data(response: Response, session_token: str = Cookie(None),
+                 credentials: HTTPBasicCredentials = Depends(security)):
     user = credentials.username
     password = credentials.password
     if user == '4dm1n' and password == 'NotSoSecurePa$$':
