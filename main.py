@@ -1,44 +1,59 @@
-from fastapi import FastAPI, Response, Cookie, HTTPException, Request, Depends
+from fastapi import FastAPI, Request, Depends, HTTPException, status, Cookie, Response, Query
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-import uvicorn
+from typing import List, Optional
+import secrets
+from datetime import date
+from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 
 app = FastAPI()
-
-app.secret_key_sample = 'qwerty'
-app.composition_to_key = 1
-app.session_token = ''
-
+# app.secret_key = "very constatn and random secret, best 64+ characters"
+app.tokens_login_token = []
+app.tokens_login_session = []
+token_value = []
+token_value1 = []
 security = HTTPBasic()
 
 
-@app.post("/login_session", status_code=201)
-def create_login_session(response: Response, credentials: HTTPBasicCredentials = Depends(security)):
-    login = credentials.username
-    password = credentials.password
-    if login == '4dm1n' and password == 'NotSoSecurePa$$':
-        session_token = app.secret_key_sample + str(app.composition_to_key)
-        app.session_token = session_token
-        app.composition_to_key += 1
-        response.set_cookie(key='session_token', value=session_token)
-    else:
-        response.status_code = 401
+@app.get("/welcome_session", status_code=200)
+def func(*, response: Response, session_token: str = Cookie(None), format: Optional[str] = None):
+    print(f'{app.tokens_login_session}')
+    if session_token not in app.tokens_login_session:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
         return response
+    if format == 'json':
+        return JSONResponse({"message": "Welcome!"})
+    if format == 'html':
+        return HTMLResponse("""
+    <html>
+        <head>
+        </head>
+        <body>
+            <h1>Welcome!</h1>
+        </body>
+    </html>
+    """)
+    else:
+        return PlainTextResponse("Welcome!")
 
 
-@app.post("/login_token", status_code=201)
-def get_login_token(response: Response, session_token: str = Cookie(None)
-                    , credentials: HTTPBasicCredentials = Depends(security)):
-    login = credentials.username
-    password = credentials.password
-    if login == '4dm1n' and password == 'NotSoSecurePa$$':
-        session_token = app.secret_key_sample + str(app.composition_to_key)
-        app.session_token = session_token
-        app.composition_to_key += 1
-        response.set_cookie(key='session_token', value=session_token)
-        return {"token": app.session_token}
-
-    if session_token == app.session_token:
-        return {"token": app.session_token}
-
-    response.status_code = 401
-    return response
+@app.get("/welcome_token", status_code=200)
+def func(response: Response, token: List[str] = Query(None), format: Optional[str] = None):
+    if not [i for i in token if i in app.tokens_login_token]:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return response
+    if format == 'json':
+        return JSONResponse({"message": "Welcome!"})
+    if format == 'html':
+        return HTMLResponse("""
+    <html>
+        <head>
+        </head>
+        <body>
+            <h1>Welcome!</h1>
+        </body>
+    </html>
+    """)
+    else:
+        return PlainTextResponse("Welcome!")
