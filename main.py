@@ -118,20 +118,23 @@ def func(token: List[str] = Query(None), format: Optional[str] = None):
 
 
 @app.delete("/logout_session")
-def logout_session(request: Request, session_token: str = Cookie(None), format: Optional[str] = None):
+def logout_session(response: Response, session_token: str = Cookie(None), format: Optional[str] = None):
     if session_token not in app.tokens_login_session:
-        raise HTTPException(status_code=401, detail="Unathorised")
+        response.status_code = 401
+        return response
     app.tokens_login_session.remove(session_token)
     url = f'/logged_out?format={format}'
+    response.status_code = 302
     return RedirectResponse(url=url, status_code=302)
 
 
 @app.delete("/logout_token")
-def logout_token(request: Request, token: List[str] = Query(None), format: Optional[str] = None):
+def logout_token(response: Response, token: List[str] = Query(None), format: Optional[str] = None):
     if not [i for i in token if i in app.tokens_login_token]:
         raise HTTPException(status_code=401, detail="Unauthorised")
     app.tokens_login_token.remove(token)
     url = f'/logged_out?format={format}'
+    response.status_code = 302
     return RedirectResponse(url=url, status_code=302)
 
 
@@ -151,3 +154,4 @@ def logged_out(format: Optional[str] = None):
     """)
     else:
         return PlainTextResponse("Logged out!")
+
