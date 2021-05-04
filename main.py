@@ -110,7 +110,7 @@ def func(token: List[str] = Query(None), format: Optional[str] = None):
 
 
 @app.delete("/logout_session")
-def logout_session(session_token: str = Cookie(None)):
+def logout_session(request: Request, session_token: str = Cookie(None),format: Optional[str] = None):
     if session_token not in app.tokens_login_session:
         raise HTTPException(status_code=401, detail="Unathorised")
     app.tokens_login_session.remove(session_token)
@@ -119,7 +119,7 @@ def logout_session(session_token: str = Cookie(None)):
 
 
 @app.delete("/logout_token")
-def logout_token(token: List[str] = Query(None)):
+def logout_token(request: Request, token: List[str] = Query(None),format: Optional[str] = None):
     if not [i for i in token if i in app.tokens_login_token]:
         raise HTTPException(status_code=401, detail="Unauthorised")
     app.tokens_login_token.remove(token)
