@@ -18,12 +18,14 @@ def login(user: str, password: str, response: Response):
         return response
     else:
         response.status_code = status.HTTP_401_UNAUTHORIZED
+        return response
 
 
 @app.post("/login_token")
 def secured_data(*, response: Response, session_token: str = Cookie(None)):
     if session_token not in app.access_tokens:
-        raise HTTPException(status_code=401, detail="Unathorised")
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return response
     else:
         app.access_tokens.remove(session_token)
         return {"token": session_token}
