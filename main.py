@@ -28,4 +28,5 @@ def secured_data(*, response: Response, session_token: str = Cookie(None)):
         return response
     else:
         app.access_tokens.remove(session_token)
+        response.status_code = status.HTTP_201_CREATED
         return {"token": session_token}
