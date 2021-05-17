@@ -1,261 +1,79 @@
-import sqlite3
-from fastapi import FastAPI, Response, Cookie, HTTPException, Request, Depends
-import uvicorn
-from pydantic import BaseModel
+from fastapi import FastAPI, Path, Depends, HTTPException, status, Response
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
+from typing import List
+
+from database import SessionLocal
+import schemas
+import crud
 
 app = FastAPI()
-app.db_connection = None
 
 
-@app.on_event("startup")
-async def startup():
-    app.db_connection = sqlite3.connect("northwind.db")
-    app.db_connection.text_factory = lambda b: b.decode(errors="ignore")  # northwind specific
+def get_db():
+    """Dependency function returning new session for each request and closing session after."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
-@app.on_event("shutdown")
-async def shutdown():
-    app.db_connection.close()
+@app.get('/')
+def get_root():
+    """Redirect to Open API documentation."""
+    return RedirectResponse('/docs')
 
 
-@app.get("/categories", status_code=200)
-async def get_categories():
-    conn = app.db_connection
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
-    categories = cursor.execute(""
-                                "select categoryid id, categoryname name "
-                                "from categories "
-                                "order by categoryid").fetchall()
-    return dict(categories=categories)
+@app.get('/suppliers', response_model=List[schemas.SupplierBrief], tags=['supplier'])
+def get_suppliers(db: Session = Depends(get_db)):
+    """Return list of all suppliers"""
+    records = crud.read_suppliers(db)
+    return [record.export() for record in records]
 
 
-@app.get("/customers", status_code=200)
-async def get_customers():
-    conn = app.db_connection
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
-    customers = cursor.execute(
-        "SELECT CustomerID id, COALESCE(CompanyName, '') name, "
-        "COALESCE(Address, '') || ' ' || COALESCE(PostalCode, '') || ' ' || COALESCE(City, "
-        "'') || "
-        "' ' || COALESCE(Country, '') full_address "
-        "from customers "
-        "ORDER BY UPPER(CustomerID);"
-    ).fetchall()
-    return dict(customers=customers)
+@app.post('/suppliers', response_model=schemas.Supplier, status_code=status.HTTP_201_CREATED, tags=['supplier'])
+def add_supplier(db: Session = Depends(get_db), supplier: schemas.Supplier = ...):
+    """Add new supplier from request body and return created object."""
+    record = crud.create_supplier(db, supplier)
+
+    return record.export()
 
 
-@app.get("/products/{id_prod}", status_code=200)
-async def get_products(response: Response, id_prod: int):
-    conn = app.db_connection
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
-    products = cursor.execute(
-        "select ProductID id, ProductName name "
-        "from Products "
-        "where ProductID = ?",
-        (id_prod,)
-    ).fetchone()
+@app.get('/suppliers/{id}', response_model=schemas.Supplier, tags=['supplier'])
+def get_supplier(db: Session = Depends(get_db), supplier_id: int = Path(..., alias='id')):
+    """Return supplier with given id."""
+    record = crud.read_supplier(db, supplier_id=supplier_id)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Supplier not found')
 
-    if products is None:
-        response.status_code = 404
-        return
-    return products
+    return record.export()
 
 
-@app.get("/employees", status_code=200)
-async def get_employees(response: Response, limit: int = 1, offset: int = 0, order: str = 'EmployeeID'):
-    validation_list = ["FirstName", "LastName", "City"]
-    order_my = order
+@app.put('/suppliers/{id}', response_model=schemas.SupplierUpdate, tags=['supplier'])
+def change_supplier(db: Session = Depends(get_db), supplier_id: int = Path(..., alias='id'),
+                    supplier: schemas.SupplierUpdate = ...):
+    """Update supplier with given id using data from request body and return updated object."""
+    record = crud.update_supplier(db, supplier_id, supplier)
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Supplier not found')
 
-    if order != "EmployeeID":
-        if order == 'first_name':
-            order_my = validation_list[0]
-        elif order == 'last_name':
-            order_my = validation_list[1]
-        elif order == 'city':
-            order_my = validation_list[2]
-        else:
-            response.status_code = 400
-            return
-
-    limit_my = limit
-    offset_my = offset
-
-    conn = app.db_connection
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
-    employees = cursor.execute(
-        f"""select EmployeeID id, LastName last_name, FirstName first_name, City city 
-        from Employees 
-        order by {order_my} 
-        LIMIT {limit_my} OFFSET {offset_my};"""
-    ).fetchall()
-
-    if employees is None:
-        response.status_code = 404
-        return
-    return dict(employees=employees)
+    return record.export()
 
 
-@app.get("/products_extended", status_code=200)
-async def get_products_extended():
-    conn = app.db_connection
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
-    products_extended = cursor.execute(
-        """select p.ProductID id, p.ProductName name, c.CategoryName category, s.CompanyName supplier
-        from Products p 
-        join categories c on p.categoryid = c.categoryid
-        join suppliers s on p.supplierid = s.supplierid
-        order by p.ProductID;
-        """
-    ).fetchall()
-    return dict(products_extended=products_extended)
+@app.delete('/suppliers/{id}', status_code=status.HTTP_204_NO_CONTENT, response_class=Response, tags=['supplier'])
+def remove_supplier(db: Session = Depends(get_db), supplier_id: int = Path(..., alias='id')):
+    """Remove supplier with given id."""
+    supplier_removed = crud.delete_supplier(db, supplier_id=supplier_id)
+    if not supplier_removed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Supplier not found')
 
 
-@app.get("/products/{id}/orders", status_code=200)
-async def get_order_with_product(response: Response, id: int):
-    conn = app.db_connection
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
-    product = cursor.execute(
-        """select productid
-        from products
-        where productid = ? ;
-        """,
-        (id,)
-    ).fetchall()
+@app.get('/suppliers/{id}/products', response_model=List[schemas.Product], tags=['supplier'])
+def get_supplier_products(db: Session = Depends(get_db), supplier_id: int = Path(..., alias='id')):
+    """Return products with given supplier id."""
+    records = crud.read_supplier_products(db, supplier_id=supplier_id)
+    if not records:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Supplier not found')
 
-    if len(product) < 1:
-        response.status_code = 404
-        return
-
-    orders = cursor.execute(
-        """select COALESCE(o.OrderId, '') id, COALESCE(c.CompanyName, '') customer, COALESCE(od.quantity, '') quantity,
-        Round(((COALESCE(od.UnitPrice, 0) * COALESCE(od.quantity, 0)) - (COALESCE(od.Discount, 0) * (COALESCE(od.UnitPrice, 0)
-         * COALESCE(od.quantity, 0)))), 2) total_price
-        from Orders o 
-        join customers c on o.customerid = c.customerid
-        join 'Order Details' od on o.orderid = od.orderid 
-        join products p on od.productid = p.productid
-        where p.productid = ?
-        order by o.OrderId;
-        """,
-        (id,)
-    ).fetchall()
-
-    return dict(orders=orders)
-
-
-class Name(BaseModel):
-    name: str
-    #
-    # def __init__(self, ):
-    #     self.name = name
-
-
-@app.post("/categories", status_code=201)
-async def create_category(name: Name):
-    conn = app.db_connection
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
-    cursor.execute(
-        """
-        insert into categories
-        values((select max(categoryid)+1 from categories), ?, null, null)
-        """,
-        (name.name,)
-    )
-    new_record = cursor.execute(
-        """
-            select categoryid id, categoryname name 
-            from categories
-            where categoryid = (select max(categoryid) from categories);
-        """
-    ).fetchone()
-    app.db_connection.commit()
-    return new_record
-
-
-@app.put("/categories/{id}", status_code=200)
-async def upd_category(id: int, name: Name, response: Response):
-    conn = app.db_connection
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
-
-    record = cursor.execute(
-        """
-            select categoryid id 
-            from categories
-            where categoryid = ?;
-        """,
-        (id,)
-    ).fetchone()
-    if record is None:
-        response.status_code = 404
-        return
-
-    cursor.execute(
-        """
-        update  categories
-        set categoryname = ?
-        where categoryid = ?
-        """,
-        (name.name, id)
-    )
-    record = cursor.execute(
-        """
-            select categoryid id, categoryname name 
-            from categories
-            where categoryid = ?;
-        """,
-        (id,)
-    ).fetchone()
-    app.db_connection.commit()
-
-    return record
-
-
-@app.delete("/categories/{id}", status_code=200)
-async def delete_category(id: int, response: Response):
-    conn = app.db_connection
-    cursor = conn.cursor()
-    cursor.row_factory = sqlite3.Row
-
-    record = cursor.execute(
-        """
-            select categoryid deleted
-            from categories
-            where categoryid = ?;
-        """,
-        (id,)
-    ).fetchone()
-
-    if record is None:
-        response.status_code = 404
-        return
-    cursor.execute(
-        """
-            delete 
-            from categories
-            where categoryid = ?;
-        """,
-        (id,)
-    )
-
-    record = cursor.execute(
-        """
-            select categoryid deleted
-            from categories
-            where categoryid = ?;
-        """,
-        (1,)
-    ).fetchone()
-    app.db_connection.commit()
-    return record
-
-
-if __name__ == '__main__':
-    uvicorn.run(app)
+    return [record.export() for record in records]
